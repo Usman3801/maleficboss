@@ -1,0 +1,149 @@
+"use client";
+import { Demos } from "@kynesyslabs/demosdk";
+
+// Demos SDK singleton instance
+let demosInstance: Demos | null = null;
+
+/**
+ * Get or create the Demos SDK instance
+ */
+export function getDemosInstance(): Demos {
+  if (!demosInstance) {
+    demosInstance = new Demos();
+  }
+  return demosInstance;
+}
+
+/**
+ * Connect to Demos Network RPC node
+ */
+export async function connectToDemosNetwork(): Promise<boolean> {
+  try {
+    const demos = getDemosInstance();
+
+    // Connect to Demos Network RPC (you can change this to your preferred node)
+    await demos.connect("https://rpc.demos.network");
+
+    return demos.connected;
+  } catch (error) {
+    console.error("Failed to connect to Demos Network:", error);
+    return false;
+  }
+}
+
+/**
+ * Create Demos identity from mnemonic seed phrase
+ * @param mnemonic - 12 or 24 word mnemonic seed phrase
+ * @returns Public key of the created identity
+ */
+export async function createDemosIdentity(mnemonic: string): Promise<string> {
+  try {
+    const demos = getDemosInstance();
+
+    // Ensure we're connected to the network
+    if (!demos.connected) {
+      await connectToDemosNetwork();
+    }
+
+    // Connect wallet with the mnemonic (master seed)
+    const publicKey = await demos.connectWallet(mnemonic, {
+      algorithm: "ed25519",
+      dual_sign: false,
+    });
+
+    return publicKey;
+  } catch (error) {
+    console.error("Failed to create Demos identity:", error);
+    throw new Error("Failed to create Demos identity from mnemonic");
+  }
+}
+
+/**
+ * Get Demos address for connected wallet
+ */
+export function getDemosAddress(): string | null {
+  try {
+    const demos = getDemosInstance();
+
+    if (!demos.walletConnected) {
+      return null;
+    }
+
+    return demos.getAddress();
+  } catch (error) {
+    console.error("Failed to get Demos address:", error);
+    return null;
+  }
+}
+
+/**
+ * Get Demos wallet connection status
+ */
+export function isDemosWalletConnected(): boolean {
+  try {
+    const demos = getDemosInstance();
+    return demos.walletConnected;
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
+ * Get Demos network connection status
+ */
+export function isDemosConnected(): boolean {
+  try {
+    const demos = getDemosInstance();
+    return demos.connected;
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
+ * Disconnect Demos wallet
+ */
+export function disconnectDemosWallet(): void {
+  // The SDK doesn't have a disconnect method, so we reset the instance
+  demosInstance = null;
+}
+
+/**
+ * Generate new mnemonic using Demos SDK
+ * @param bits - 128 (12 words) or 256 (24 words)
+ */
+export function generateDemosMnemonic(bits: 128 | 256 = 128): string {
+  const demos = getDemosInstance();
+  return demos.newMnemonic(bits);
+}
+
+/**
+ * Get address nonce for transactions
+ */
+export async function getDemosAddressNonce(address: string): Promise<number> {
+  try {
+    const demos = getDemosInstance();
+    return await demos.getAddressNonce(address);
+  } catch (error) {
+    console.error("Failed to get address nonce:", error);
+    return 0;
+  }
+}
+
+/**
+ * Sign a message with Demos wallet
+ */
+export async function signDemosMessage(message: string): Promise<string> {
+  try {
+    const demos = getDemosInstance();
+
+    if (!demos.walletConnected) {
+      throw new Error("Wallet not connected");
+    }
+
+    return await demos.signMessage(message);
+  } catch (error) {
+    console.error("Failed to sign message:", error);
+    throw error;
+  }
+}

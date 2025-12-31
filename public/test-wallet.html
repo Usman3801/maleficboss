@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wallet Connection Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #000;
+            color: #fff;
+        }
+        button {
+            background: #fff;
+            color: #000;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 8px;
+            margin: 10px 0;
+            width: 100%;
+        }
+        button:hover {
+            background: #ddd;
+        }
+        .info {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border: 1px solid #333;
+        }
+        .success {
+            color: #4ade80;
+        }
+        .error {
+            color: #f87171;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔌 Wallet Connection Test</h1>
+
+    <div class="info">
+        <h3>Status:</h3>
+        <p id="status">Not connected</p>
+    </div>
+
+    <div class="info">
+        <h3>Wallet Address:</h3>
+        <p id="address">-</p>
+    </div>
+
+    <div class="info">
+        <h3>Chain ID:</h3>
+        <p id="chainId">-</p>
+    </div>
+
+    <button onclick="connectWallet()">Connect MetaMask</button>
+    <button onclick="disconnectWallet()">Disconnect</button>
+    <button onclick="checkWallets()">Check Available Wallets</button>
+
+    <div class="info">
+        <h3>Console Log:</h3>
+        <pre id="log" style="max-height: 300px; overflow-y: auto;"></pre>
+    </div>
+
+    <script>
+        const log = (message, type = 'info') => {
+            const logEl = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#f87171' : type === 'success' ? '#4ade80' : '#fff';
+            logEl.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+            logEl.scrollTop = logEl.scrollHeight;
+            console.log(message);
+        };
+
+        const updateUI = (address, chainId) => {
+            document.getElementById('status').innerHTML = address
+                ? '<span class="success">✅ Connected</span>'
+                : '<span class="error">❌ Not connected</span>';
+            document.getElementById('address').textContent = address || '-';
+            document.getElementById('chainId').textContent = chainId || '-';
+        };
+
+        async function checkWallets() {
+            log('Checking for available wallets...');
+
+            if (typeof window.ethereum !== 'undefined') {
+                log('✅ window.ethereum is available', 'success');
+                log('Provider: ' + (window.ethereum.isMetaMask ? 'MetaMask' : 'Other'));
+
+                // Check for multiple wallets
+                if (window.ethereum.providers) {
+                    log('Multiple wallets detected:', 'success');
+                    window.ethereum.providers.forEach((provider, index) => {
+                        log(`  ${index + 1}. ${provider.isMetaMask ? 'MetaMask' : 'Unknown'}`);
+                    });
+                } else {
+                    log('Single wallet detected');
+                }
+            } else {
+                log('❌ No wallet detected. Please install MetaMask.', 'error');
+            }
+        }
+
+        async function connectWallet() {
+            log('Attempting to connect wallet...');
+
+            if (typeof window.ethereum === 'undefined') {
+                log('❌ MetaMask not installed', 'error');
+                alert('Please install MetaMask browser extension');
+                return;
+            }
+
+            try {
+                log('Requesting accounts from wallet...');
+                const accounts = await window.ethereum.request({
+                    method: 'eth_requestAccounts'
+                });
+
+                const chainId = await window.ethereum.request({
+                    method: 'eth_chainId'
+                });
+
+                log('✅ Connected successfully!', 'success');
+                log('Address: ' + accounts[0], 'success');
+                log('Chain ID: ' + chainId, 'success');
+
+                updateUI(accounts[0], parseInt(chainId, 16));
+
+                // Try switching to Demos Testnet
+                await switchToTestnet();
+
+            } catch (error) {
+                log('❌ Error: ' + error.message, 'error');
+                console.error('Connection error:', error);
+            }
+        }
+
+        async function switchToTestnet() {
+            try {
+                log('Attempting to switch to Demos Testnet...');
+                await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: '0x1E240' }], // 123456 in hex
+                });
+                log('✅ Switched to Demos Testnet', 'success');
+            } catch (switchError) {
+                // Chain not added, try adding it
+                if (switchError.code === 4902) {
+                    try {
+                        log('Adding Demos Testnet to wallet...');
+                        await window.ethereum.request({
+                            method: 'wallet_addEthereumChain',
+                            params: [{
+                                chainId: '0x1E240',
+                                chainName: 'Demos Testnet',
+                                nativeCurrency: {
+                                    name: 'DEMOS',
+                                    symbol: 'DEMOS',
+                                    decimals: 18
+                                },
+                                rpcUrls: ['https://testnet-rpc.demos.network'],
+                                blockExplorerUrls: ['https://explorer.demos.network']
+                            }]
+                        });
+                        log('✅ Demos Testnet added successfully', 'success');
+                    } catch (addError) {
+                        log('❌ Failed to add network: ' + addError.message, 'error');
+                    }
+                } else {
+                    log('⚠️ Could not switch network: ' + switchError.message, 'error');
+                }
+            }
+        }
+
+        function disconnectWallet() {
+            log('Disconnecting...');
+            updateUI(null, null);
+            log('✅ Disconnected', 'success');
+        }
+
+        // Listen for account changes
+        if (typeof window.ethereum !== 'undefined') {
+            window.ethereum.on('accountsChanged', (accounts) => {
+                log('Account changed: ' + (accounts[0] || 'disconnected'));
+                if (accounts.length === 0) {
+                    updateUI(null, null);
+                } else {
+                    updateUI(accounts[0], null);
+                }
+            });
+
+            window.ethereum.on('chainChanged', (chainId) => {
+                log('Chain changed: ' + parseInt(chainId, 16));
+                window.location.reload();
+            });
+        }
+
+        // Check on load
+        window.addEventListener('load', () => {
+            log('Page loaded. Checking for wallets...');
+            checkWallets();
+        });
+    </script>
+</body>
+</html>
