@@ -59,10 +59,7 @@ export class DemosNodeConnector {
     this.rpcUrl = config.rpcUrl || DEMOS_CONFIG[this.network];
 
     // Initialize Demos SDK client
-    this.demosClient = new Demos({
-      rpcUrl: this.rpcUrl,
-      chainId: this.network === "mainnet" ? DEMOS_CONFIG.mainnetChainId : DEMOS_CONFIG.testnetChainId,
-    });
+    this.demosClient = new Demos();
 
     console.log(`🌐 Connected to Demos ${this.network} at ${this.rpcUrl}`);
   }
