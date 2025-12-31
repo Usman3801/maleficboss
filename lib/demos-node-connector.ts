@@ -161,10 +161,10 @@ export class DemosNodeConnector {
 
       const txResult: DemosTransaction = {
         hash: transaction.hash || "",
-        from: transaction.sender || "",
-        to: transaction.receiver || "",
+        from: transaction.content?.from || "",
+        to: transaction.content?.to || "",
         value: tx.value,
-        nonce: transaction.nonce || 0,
+        nonce: transaction.content?.nonce || 0,
       };
 
       console.log("✅ Transaction sent:", txResult.hash);
