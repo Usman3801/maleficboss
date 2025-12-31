@@ -3,10 +3,10 @@
 /**
  * Demos Node Connector
  * Integrates with Demos Network using @kynesyslabs/demosdk
+ * Updated: 2025-12-31 - Fixed to use actual Demos SDK API
  */
 
 import { Demos } from "@kynesyslabs/demosdk/websdk";
-import { Wallet } from "ethers";
 
 // Demos Network Configuration
 const DEMOS_CONFIG = {
@@ -41,8 +41,6 @@ export interface DemosTransaction {
   value: string;
   data?: string;
   nonce: number;
-  gasLimit?: string;
-  gasPrice?: string;
 }
 
 /**
@@ -58,10 +56,24 @@ export class DemosNodeConnector {
     this.network = config.network || "testnet";
     this.rpcUrl = config.rpcUrl || DEMOS_CONFIG[this.network];
 
-    // Initialize Demos SDK client (no config needed)
+    // Initialize Demos SDK client
     this.demosClient = new Demos();
 
-    console.log(`🌐 Connected to Demos ${this.network} at ${this.rpcUrl}`);
+    console.log(`🌐 Demos SDK initialized for ${this.network}`);
+  }
+
+  /**
+   * Initialize connection to RPC
+   */
+  async initialize(): Promise<boolean> {
+    try {
+      const connected = await this.demosClient.connect(this.rpcUrl);
+      console.log(`🌐 Connected to Demos ${this.network} at ${this.rpcUrl}`);
+      return connected;
+    } catch (error) {
+      console.error("Failed to connect to RPC:", error);
+      throw error;
+    }
   }
 
   /**
@@ -76,20 +88,23 @@ export class DemosNodeConnector {
    */
   async connectWallet(mnemonic: string): Promise<DemosAccount> {
     try {
-      // Derive wallet from mnemonic
-      const wallet = Wallet.fromPhrase(mnemonic);
+      // Ensure RPC is connected first
+      if (!this.demosClient.connected) {
+        await this.initialize();
+      }
 
-      // Connect wallet to Demos client - pass mnemonic string directly
-      await this.demosClient.connect(mnemonic);
+      // Connect wallet using Demos SDK
+      const publicKey = await this.demosClient.connectWallet(mnemonic);
+      const address = this.demosClient.getAddress();
 
       // Get account info
-      const balance = await this.demosClient.getBalance(wallet.address);
-      const nonce = await this.demosClient.getNonce(wallet.address);
+      const addressInfo = await this.demosClient.getAddressInfo(address);
+      const nonce = await this.demosClient.getAddressNonce(address);
 
       const account: DemosAccount = {
-        address: wallet.address,
-        publicKey: wallet.publicKey,
-        balance: balance.toString(),
+        address,
+        publicKey,
+        balance: addressInfo?.balance?.toString() || "0",
         nonce,
       };
 
@@ -106,8 +121,8 @@ export class DemosNodeConnector {
    */
   async getBalance(address: string): Promise<string> {
     try {
-      const balance = await this.demosClient.getBalance(address);
-      return balance.toString();
+      const addressInfo = await this.demosClient.getAddressInfo(address);
+      return addressInfo?.balance?.toString() || "0";
     } catch (error) {
       console.error("Failed to get balance:", error);
       throw error;
@@ -119,7 +134,7 @@ export class DemosNodeConnector {
    */
   async getNonce(address: string): Promise<number> {
     try {
-      return await this.demosClient.getNonce(address);
+      return await this.demosClient.getAddressNonce(address);
     } catch (error) {
       console.error("Failed to get nonce:", error);
       throw error;
@@ -132,28 +147,28 @@ export class DemosNodeConnector {
   async sendTransaction(tx: {
     to: string;
     value: string;
-    data?: string;
   }): Promise<DemosTransaction> {
     try {
-      const txResponse = await this.demosClient.sendTransaction({
-        to: tx.to,
-        value: tx.value,
-        data: tx.data,
-      });
+      // Create and sign transaction
+      const amount = parseFloat(tx.value);
+      const transaction = await this.demosClient.transfer(tx.to, amount);
 
-      const transaction: DemosTransaction = {
-        hash: txResponse.hash,
-        from: txResponse.from,
-        to: txResponse.to,
-        value: txResponse.value.toString(),
-        data: txResponse.data,
-        nonce: txResponse.nonce,
-        gasLimit: txResponse.gasLimit?.toString(),
-        gasPrice: txResponse.gasPrice?.toString(),
+      // Confirm transaction
+      const validityData = await this.demosClient.confirm(transaction);
+
+      // Broadcast transaction
+      const response = await this.demosClient.broadcast(validityData);
+
+      const txResult: DemosTransaction = {
+        hash: transaction.hash || "",
+        from: transaction.sender || "",
+        to: transaction.receiver || "",
+        value: tx.value,
+        nonce: transaction.nonce || 0,
       };
 
-      console.log("✅ Transaction sent:", transaction.hash);
-      return transaction;
+      console.log("✅ Transaction sent:", txResult.hash);
+      return txResult;
     } catch (error) {
       console.error("Failed to send transaction:", error);
       throw error;
@@ -161,11 +176,11 @@ export class DemosNodeConnector {
   }
 
   /**
-   * Get transaction receipt
+   * Get transaction by hash
    */
   async getTransactionReceipt(txHash: string): Promise<any> {
     try {
-      return await this.demosClient.getTransactionReceipt(txHash);
+      return await this.demosClient.getTxByHash(txHash);
     } catch (error) {
       console.error("Failed to get transaction receipt:", error);
       throw error;
@@ -173,11 +188,11 @@ export class DemosNodeConnector {
   }
 
   /**
-   * Get block number
+   * Get last block number
    */
   async getBlockNumber(): Promise<number> {
     try {
-      return await this.demosClient.getBlockNumber();
+      return await this.demosClient.getLastBlockNumber();
     } catch (error) {
       console.error("Failed to get block number:", error);
       throw error;
@@ -189,7 +204,7 @@ export class DemosNodeConnector {
    */
   async getBlock(blockNumber: number): Promise<any> {
     try {
-      return await this.demosClient.getBlock(blockNumber);
+      return await this.demosClient.getBlockByNumber(blockNumber);
     } catch (error) {
       console.error("Failed to get block:", error);
       throw error;
@@ -197,71 +212,13 @@ export class DemosNodeConnector {
   }
 
   /**
-   * Get gas price
+   * Get transaction history for address
    */
-  async getGasPrice(): Promise<string> {
+  async getTransactionHistory(address: string, limit: number = 100): Promise<any[]> {
     try {
-      const gasPrice = await this.demosClient.getGasPrice();
-      return gasPrice.toString();
+      return await this.demosClient.getTransactionHistory(address, "all", { start: 0, limit });
     } catch (error) {
-      console.error("Failed to get gas price:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * Estimate gas for transaction
-   */
-  async estimateGas(tx: {
-    to: string;
-    value?: string;
-    data?: string;
-  }): Promise<string> {
-    try {
-      const gasEstimate = await this.demosClient.estimateGas(tx);
-      return gasEstimate.toString();
-    } catch (error) {
-      console.error("Failed to estimate gas:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * Deploy contract
-   */
-  async deployContract(bytecode: string, abi: any[]): Promise<string> {
-    try {
-      const contractAddress = await this.demosClient.deployContract({
-        bytecode,
-        abi,
-      });
-
-      console.log("✅ Contract deployed at:", contractAddress);
-      return contractAddress;
-    } catch (error) {
-      console.error("Failed to deploy contract:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * Call contract method
-   */
-  async callContract(
-    contractAddress: string,
-    abi: any[],
-    method: string,
-    args: any[]
-  ): Promise<any> {
-    try {
-      return await this.demosClient.callContract({
-        address: contractAddress,
-        abi,
-        method,
-        args,
-      });
-    } catch (error) {
-      console.error("Failed to call contract:", error);
+      console.error("Failed to get transaction history:", error);
       throw error;
     }
   }
