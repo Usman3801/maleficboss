@@ -58,7 +58,7 @@ export class DemosNodeConnector {
     this.network = config.network || "testnet";
     this.rpcUrl = config.rpcUrl || DEMOS_CONFIG[this.network];
 
-    // Initialize Demos SDK client
+    // Initialize Demos SDK client (no config needed)
     this.demosClient = new Demos();
 
     console.log(`🌐 Connected to Demos ${this.network} at ${this.rpcUrl}`);
