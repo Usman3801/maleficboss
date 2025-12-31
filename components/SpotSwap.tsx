@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useWallet } from "@/contexts/WalletContext";
+import { useWalletConnection } from "@/hooks/useWalletConnection";
 import { ArrowRightLeft, Loader2, Settings } from "lucide-react";
 
 const TOKENS = [
@@ -11,7 +11,7 @@ const TOKENS = [
 ];
 
 export default function SpotSwap() {
-  const { isConnected } = useWallet();
+  const { isConnected } = useWalletConnection();
   const [fromToken, setFromToken] = useState(TOKENS[0]);
   const [toToken, setToToken] = useState(TOKENS[1]);
   const [fromAmount, setFromAmount] = useState("");

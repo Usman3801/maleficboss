@@ -1,7 +1,6 @@
-"use client";
 import { createConfig, http } from "wagmi";
 import { defineChain } from "viem";
-import { injected } from "wagmi/connectors";
+import { injected, walletConnect } from "wagmi/connectors";
 
 export const demosTestnet = defineChain({
   id: 123456,
@@ -13,40 +12,29 @@ export const demosTestnet = defineChain({
   },
   rpcUrls: {
     default: {
-      http: ["https://testnet-rpc.demos.network"],
+      http: [process.env.NEXT_PUBLIC_DEMOS_NETWORK_RPC || "https://testnet-rpc.demos.network"],
     },
   },
   blockExplorers: {
     default: {
       name: "Demos Explorer",
-      url: "https://explorer.demos.sh",
+      url: "https://explorer.demos.network",
     },
   },
   testnet: true,
 });
 
-// Only Demos Wallet connector
-const getConnectors = () => {
-  const connectorsList = [];
-
-  try {
-    // Demos Wallet ONLY
-    // Chrome Extension: https://chromewebstore.google.com/detail/demos-wallet/nefongcpmdahjaijjkihgieiamoahcoo
-    connectorsList.push(
-      injected({
-        shimDisconnect: true,
-      })
-    );
-  } catch (error) {
-    console.warn("Failed to initialize Demos Wallet connector:", error);
-  }
-
-  return connectorsList;
-};
-
 export const config = createConfig({
   chains: [demosTestnet],
-  connectors: getConnectors(),
+  connectors: [
+    injected({
+      shimDisconnect: true,
+    }),
+    walletConnect({
+      projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "demo-project-id",
+      showQrModal: true,
+    }),
+  ],
   transports: {
     [demosTestnet.id]: http(),
   },

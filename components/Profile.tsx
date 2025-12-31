@@ -1,10 +1,10 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useWallet } from "@/contexts/WalletContext";
+import { useWalletConnection } from "@/hooks/useWalletConnection";
 import { User, Github, Twitter, Send as TelegramIcon, Link as LinkIcon, CheckCircle, Loader2 } from "lucide-react";
 
 export default function Profile() {
-  const { isConnected, address } = useWallet();
+  const { isConnected, address } = useWalletConnection();
   const [connections, setConnections] = useState({
     github: { connected: false, username: "" },
     twitter: { connected: false, username: "" },

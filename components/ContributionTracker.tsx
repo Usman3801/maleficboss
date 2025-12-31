@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useWallet } from "@/contexts/WalletContext";
+import { useWalletConnection } from "@/hooks/useWalletConnection";
 import { Github, MessageCircle, Twitter, Send as TelegramIcon, Rocket, Loader2, AlertCircle } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
@@ -40,7 +40,7 @@ interface WeeklyData {
 }
 
 export default function ContributionTracker() {
-  const { isConnected, address } = useWallet();
+  const { isConnected, address } = useWalletConnection();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<SocialStats>({

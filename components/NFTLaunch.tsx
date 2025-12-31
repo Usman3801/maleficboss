@@ -1,10 +1,10 @@
 "use client";
 import { useState } from "react";
-import { useWallet } from "@/contexts/WalletContext";
+import { useWalletConnection } from "@/hooks/useWalletConnection";
 import { Image as ImageIcon, Loader2, Upload } from "lucide-react";
 
 export default function NFTLaunch() {
-  const { isConnected } = useWallet();
+  const { isConnected } = useWalletConnection();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     collectionName: "",

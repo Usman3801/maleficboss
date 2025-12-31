@@ -1,193 +1,167 @@
 "use client";
-import { Wallet, Settings } from "lucide-react";
-import { useState } from "react";
-import {
-  generateWallet,
-  importWalletFromMnemonic,
-  storeWalletData,
-  clearWalletData,
-  encryptMnemonic,
-} from "@/lib/wallet-generator";
-import { useWallet } from "@/contexts/WalletContext";
-import { getOrCreateDemosIdentity, storeDemosIdentity } from "@/lib/demos-api";
-import WalletConnectionModal from "./WalletConnectionModal";
-import MnemonicImport from "./MnemonicImport";
-import WalletGenerated from "./WalletGenerated";
-import SettingsReorganized from "./SettingsReorganized";
-import WalletAddressPopup from "./WalletAddressPopup";
+import { useState, useEffect } from "react";
+import { Wallet, Settings, Copy, Check, LogOut } from "lucide-react";
+import WalletModal from "./WalletModal";
+import SettingsModal from "./SettingsModal";
 import HamburgerMenu from "./HamburgerMenu";
 
 interface HeaderProps {
   onNavigate?: (tab: string) => void;
-  currentTab?: string;
+  onHomeClick?: () => void;
 }
 
-export default function Header({ onNavigate, currentTab }: HeaderProps) {
-  const { isConnected, address, setWalletConnected, setWalletDisconnected } = useWallet();
-  const [showConnectionModal, setShowConnectionModal] = useState(false);
-  const [showMnemonicImport, setShowMnemonicImport] = useState(false);
-  const [showWalletGenerated, setShowWalletGenerated] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [showAddressPopup, setShowAddressPopup] = useState(false);
-  const [generatedWallet, setGeneratedWallet] = useState<{
-    address: string;
-    mnemonic: string;
-  } | null>(null);
+export default function Header({ onNavigate, onHomeClick }: HeaderProps) {
+  const [isConnected, setIsConnected] = useState(false);
+  const [address, setAddress] = useState<string | null>(null);
+  const [mnemonic, setMnemonic] = useState<string | null>(null);
+  const [showWalletModal, setShowWalletModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showWalletDropdown, setShowWalletDropdown] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  // Generate new wallet
-  const handleGenerate = async () => {
-    try {
-      const wallet = generateWallet();
+  useEffect(() => {
+    // Check for existing wallet connection
+    const storedAddress = localStorage.getItem("demos_wallet_address");
+    const storedMnemonic = localStorage.getItem("demos_wallet_mnemonic");
 
-      // Store wallet data (encrypted with a simple password for now)
-      const password = "demos-wallet"; // In production, get this from user
-      const encrypted = encryptMnemonic(wallet.mnemonic, password);
-      storeWalletData(wallet.address, encrypted);
+    if (storedAddress) {
+      setAddress(storedAddress);
+      setIsConnected(true);
+    }
 
-      // Create or get Demos identity from the mnemonic
-      try {
-        const demosIdentity = await getOrCreateDemosIdentity(wallet.mnemonic);
-        storeDemosIdentity(demosIdentity);
-        console.log("✅ Demos identity ready:", demosIdentity.address);
-      } catch (demosError) {
-        console.error("⚠️ Failed to setup Demos identity:", demosError);
-        // Continue even if Demos identity creation fails
-      }
+    if (storedMnemonic) {
+      setMnemonic(storedMnemonic);
+    }
+  }, []);
 
-      setGeneratedWallet({
-        address: wallet.address,
-        mnemonic: wallet.mnemonic,
-      });
-      setShowConnectionModal(false);
-      setShowWalletGenerated(true);
-    } catch (error) {
-      console.error("Failed to generate wallet:", error);
-      alert("Failed to generate wallet. Please try again.");
+  const handleWalletConnected = (walletAddress: string, walletMnemonic: string) => {
+    setAddress(walletAddress);
+    setMnemonic(walletMnemonic);
+    setIsConnected(true);
+
+    // Store in localStorage
+    localStorage.setItem("demos_wallet_address", walletAddress);
+    localStorage.setItem("demos_wallet_mnemonic", walletMnemonic);
+    localStorage.setItem("demos_wallet_connected", "true");
+
+    // Dispatch custom event for other components to listen
+    window.dispatchEvent(new Event("wallet-connected"));
+
+    setShowWalletModal(false);
+
+    // TODO: Create/find Demos identity using MCP and API
+    console.log("Wallet connected:", walletAddress);
+  };
+
+  const handleDisconnect = () => {
+    setAddress(null);
+    setMnemonic(null);
+    setIsConnected(false);
+    setShowWalletDropdown(false);
+
+    // Clear localStorage
+    localStorage.removeItem("demos_wallet_address");
+    localStorage.removeItem("demos_wallet_mnemonic");
+    localStorage.removeItem("demos_wallet_connected");
+
+    // Dispatch custom event for other components to listen
+    window.dispatchEvent(new Event("wallet-disconnected"));
+  };
+
+  const handleCopyAddress = () => {
+    if (address) {
+      navigator.clipboard.writeText(address);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
-  // Import wallet from mnemonic
-  const handleImport = async (mnemonic: string) => {
-    try {
-      const wallet = importWalletFromMnemonic(mnemonic);
-
-      // Store wallet data
-      const password = "demos-wallet";
-      const encrypted = encryptMnemonic(wallet.mnemonic, password);
-      storeWalletData(wallet.address, encrypted);
-
-      // Check or create Demos identity from the imported mnemonic
-      try {
-        const demosIdentity = await getOrCreateDemosIdentity(wallet.mnemonic);
-        storeDemosIdentity(demosIdentity);
-
-        if (demosIdentity.exists) {
-          console.log("✅ Existing Demos identity found:", demosIdentity.address);
-        } else {
-          console.log("✅ New Demos identity created:", demosIdentity.address);
-        }
-
-        setWalletConnected(wallet.address, demosIdentity.address);
-      } catch (demosError) {
-        console.error("⚠️ Failed to setup Demos identity:", demosError);
-        // Continue even if Demos identity creation fails
-        setWalletConnected(wallet.address);
-      }
-
-      setShowMnemonicImport(false);
-    } catch (error: any) {
-      console.error("Failed to import wallet:", error);
-      throw error; // Let MnemonicImport component handle the error
+  const handleLogoClick = () => {
+    if (onHomeClick) {
+      onHomeClick();
     }
-  };
-
-  // Continue to dashboard after wallet generation
-  const handleContinueToDashboard = async () => {
-    if (generatedWallet) {
-      // Get Demos identity from storage
-      try {
-        const { getStoredDemosIdentity } = await import("@/lib/demos-api");
-        const demosIdentity = getStoredDemosIdentity();
-
-        if (demosIdentity) {
-          setWalletConnected(generatedWallet.address, demosIdentity.address);
-        } else {
-          setWalletConnected(generatedWallet.address);
-        }
-      } catch (error) {
-        console.error("Failed to get Demos identity:", error);
-        setWalletConnected(generatedWallet.address);
-      }
-
-      setShowWalletGenerated(false);
-      setGeneratedWallet(null);
-    }
-  };
-
-  // Disconnect wallet
-  const handleDisconnect = async () => {
-    clearWalletData();
-
-    // Clear Demos identity
-    try {
-      const { clearDemosIdentity } = await import("@/lib/demos-api");
-      clearDemosIdentity();
-    } catch (error) {
-      console.error("Error clearing Demos identity:", error);
-    }
-
-    setWalletDisconnected();
-  };
-
-  // Open settings
-  const handleSettings = () => {
-    setShowSettings(true);
   };
 
   return (
     <>
-      <header className="border-b border-border bg-black sticky top-0 z-50">
+      <header className="border-b border-gray-800 bg-black sticky top-0 z-40">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
+            {/* Left: Hamburger + Logo */}
             <div className="flex items-center gap-4">
-              {/* Hamburger Menu */}
-              {onNavigate && currentTab && (
-                <HamburgerMenu onNavigate={onNavigate} currentTab={currentTab} />
-              )}
+              <HamburgerMenu onNavigate={onNavigate} />
+              <button
+                onClick={handleLogoClick}
+                className="text-2xl font-bold hover:text-gray-300 transition-colors"
+              >
+                DEMOS
+              </button>
             </div>
-            <div className="flex items-center space-x-3">
+
+            {/* Right: Settings + Wallet */}
+            <div className="flex items-center gap-3">
+              {isConnected && (
+                <button
+                  onClick={() => setShowSettingsModal(true)}
+                  className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                  aria-label="Settings"
+                >
+                  <Settings size={20} />
+                </button>
+              )}
+
               {isConnected ? (
-                <>
-                  {/* Account Name with Disconnect and Settings */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleDisconnect}
-                      className="px-3 py-2 bg-red-900/20 text-red-400 rounded-lg border border-red-900/50 text-sm hover:bg-red-900/30 transition-colors"
-                    >
-                      Disconnect
-                    </button>
-                    <button
-                      onClick={() => setShowAddressPopup(true)}
-                      className="px-4 py-2 bg-secondary rounded-lg border border-border text-sm hover:bg-zinc-800 transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Wallet size={16} />
-                        <span className="font-mono">{address?.slice(0, 6)}...{address?.slice(-4)}</span>
+                <div className="relative">
+                  <button
+                    onClick={() => setShowWalletDropdown(!showWalletDropdown)}
+                    className="px-4 py-2 bg-white text-black hover:bg-gray-200 rounded-lg font-mono text-sm transition-colors flex items-center gap-2"
+                  >
+                    <Wallet size={18} />
+                    {address?.slice(0, 6)}...{address?.slice(-4)}
+                  </button>
+
+                  {/* Wallet Dropdown */}
+                  {showWalletDropdown && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={() => setShowWalletDropdown(false)}
+                      />
+                      <div className="absolute right-0 mt-2 w-80 bg-[#0a0a0a] border border-gray-800 rounded-xl shadow-xl z-20">
+                        <div className="p-4 border-b border-gray-800">
+                          <p className="text-xs text-gray-500 mb-2">Wallet Address</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-mono text-sm flex-1 break-all">{address}</p>
+                            <button
+                              onClick={handleCopyAddress}
+                              className="p-2 hover:bg-gray-800 rounded-lg transition-colors flex-shrink-0"
+                            >
+                              {copied ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="p-2">
+                          <button
+                            onClick={handleDisconnect}
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-800 rounded-lg transition-colors text-red-400"
+                          >
+                            <LogOut size={18} />
+                            <span>Disconnect Wallet</span>
+                          </button>
+                        </div>
                       </div>
-                    </button>
-                    <button
-                      onClick={handleSettings}
-                      className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
-                      title="Settings"
-                    >
-                      <Settings size={20} className="text-gray-400 hover:text-white" />
-                    </button>
-                  </div>
-                </>
+                    </>
+                  )}
+                </div>
               ) : (
                 <button
-                  onClick={() => setShowConnectionModal(true)}
-                  className="btn-primary flex items-center space-x-2"
+                  onClick={() => {
+                    console.log("Connect Wallet button clicked!");
+                    setShowWalletModal(true);
+                  }}
+                  className="btn-primary flex items-center gap-2 px-6 py-2"
+                  type="button"
                 >
                   <Wallet size={18} />
                   <span>Connect Wallet</span>
@@ -198,48 +172,19 @@ export default function Header({ onNavigate, currentTab }: HeaderProps) {
         </div>
       </header>
 
-      {/* Connection Modal - Generate or Import */}
-      {showConnectionModal && (
-        <WalletConnectionModal
-          onGenerate={handleGenerate}
-          onImportMnemonic={() => {
-            setShowConnectionModal(false);
-            setShowMnemonicImport(true);
-          }}
-          onClose={() => setShowConnectionModal(false)}
-        />
-      )}
+      {/* Modals */}
+      <WalletModal
+        isOpen={showWalletModal}
+        onClose={() => setShowWalletModal(false)}
+        onWalletConnected={handleWalletConnected}
+      />
 
-      {/* Mnemonic Import Modal */}
-      {showMnemonicImport && (
-        <MnemonicImport
-          onImport={handleImport}
-          onClose={() => setShowMnemonicImport(false)}
-        />
-      )}
-
-      {/* Wallet Generated Modal */}
-      {showWalletGenerated && generatedWallet && (
-        <WalletGenerated
-          address={generatedWallet.address}
-          mnemonic={generatedWallet.mnemonic}
-          onContinue={handleContinueToDashboard}
-        />
-      )}
-
-      {/* Wallet Address Popup */}
-      {showAddressPopup && isConnected && address && (
-        <WalletAddressPopup
-          address={address}
-          onDisconnect={handleDisconnect}
-          onClose={() => setShowAddressPopup(false)}
-        />
-      )}
-
-      {/* Wallet Settings Modal */}
-      {showSettings && isConnected && address && (
-        <SettingsReorganized address={address} onClose={() => setShowSettings(false)} />
-      )}
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        address={address}
+        mnemonic={mnemonic}
+      />
     </>
   );
 }

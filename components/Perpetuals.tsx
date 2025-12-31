@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useWallet } from "@/contexts/WalletContext";
+import { useWalletConnection } from "@/hooks/useWalletConnection";
 import { TrendingUp, TrendingDown, Loader2 } from "lucide-react";
 
 const PERP_TOKENS = [
@@ -17,7 +17,7 @@ const PERP_TOKENS = [
 ];
 
 export default function Perpetuals() {
-  const { isConnected } = useWallet();
+  const { isConnected } = useWalletConnection();
   const [selectedToken, setSelectedToken] = useState(PERP_TOKENS[0]);
   const [position, setPosition] = useState<"long" | "short">("long");
   const [leverage, setLeverage] = useState(1);

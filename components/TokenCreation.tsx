@@ -1,10 +1,10 @@
 "use client";
 import { useState } from "react";
-import { useWallet } from "@/contexts/WalletContext";
+import { useWalletConnection } from "@/hooks/useWalletConnection";
 import { Coins, Loader2 } from "lucide-react";
 
 export default function TokenCreation() {
-  const { isConnected } = useWallet();
+  const { isConnected } = useWalletConnection();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
