@@ -79,8 +79,8 @@ export class DemosNodeConnector {
       // Derive wallet from mnemonic
       const wallet = Wallet.fromPhrase(mnemonic);
 
-      // Connect wallet to Demos client
-      await this.demosClient.connect(wallet);
+      // Connect wallet to Demos client - pass mnemonic string directly
+      await this.demosClient.connect(mnemonic);
 
       // Get account info
       const balance = await this.demosClient.getBalance(wallet.address);
